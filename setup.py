@@ -25,10 +25,10 @@ setup(name='hana',
     classifiers=[
         'Development Status :: 3 - Alpha',
 
-        'License :: Other/Proprietary License',
+        'License :: OSI Approved :: MIT License',
 
         'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 3',
+#        'Programming Language :: Python :: 3',
     ],
 
     keywords='hana static site generator processing file',
