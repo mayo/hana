@@ -1,2 +1,2 @@
-frontmatter==0.4.2
+python-frontmatter==0.4.2
 pathspec==0.5.2
