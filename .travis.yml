@@ -1,0 +1,14 @@
+language: python
+sudo: false
+python:
+  - '2.7'
+  - '3.4'
+install:
+  - pip install --user .
+  - pip install --user -r requirements.txt
+script: pytest
+deploy:
+  provider: pypi
+  user: mayo
+  on:
+    branch: master
