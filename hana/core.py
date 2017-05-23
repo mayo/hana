@@ -40,6 +40,10 @@ class Hana():
         if not self._output or not os.path.isdir(self._output):
             raise errors.HanaMissingOutputDirectoryError()
 
+    @property
+    def source(self):
+        return self._source
+
     #TODO: should we support filter natively?
     def use(self, plugin):
         self.plugins.append(plugin)
