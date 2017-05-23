@@ -18,6 +18,18 @@ def test_simple():
 
     b.build(clean=True)
 
+def test_use():
+    plugin_executed = {}
+
+    def plugin(files, hana):
+        plugin_executed['executed'] = True
+
+    b = hana.Hana(source='test/simple', output='test/out')
+    b.use(plugin).build(clean=True)
+
+    assert plugin_executed
+
+
 def test_plugins():
     plugin_executed = {}
 
