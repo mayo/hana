@@ -64,7 +64,6 @@ class Hana():
     def _find_files(self):
         self.files = self._file_loader.get_files()
 
-
     def _process(self):
         for plugin in self.plugins:
             plugin(self.files, self)
@@ -77,15 +76,15 @@ class Hana():
                 if not dir:
                     return
 
-                if os.path.isdir(os.path.join(path, dir)):
-                    return
-
-                if os.path.isdir(path) or path == '':
-                    dirpath = os.path.join(self._output, path, dir)
-                    os.mkdir(dirpath)
+                if os.path.isdir(os.path.join(self._output, path, dir)):
                     return
 
                 makedirs(*os.path.split(path))
+
+                if os.path.isdir(os.path.join(self._output, path)) or path == '':
+                    dirpath = os.path.join(self._output, path, dir)
+                    os.mkdir(dirpath)
+                    return
 
             makedirs(*os.path.split(os.path.dirname(filename)))
 
