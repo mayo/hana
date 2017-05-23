@@ -1,2 +1,2 @@
-python-frontmatter==0.4.2
-pathspec==0.5.2
+-e .
+pytest==3.0.7

@@ -10,10 +10,15 @@ with open(path.join(basedir, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(name='hana',
-    version='0.0.1',
+    version='0.0.1dev',
 
     description='Static site generator',
     long_description=long_description,
+
+    install_requires=[
+        'python-frontmatter>=0.4.2',
+        'pathspec>=0.5.2',
+    ],
 
     author='Mayo Jordanov',
     author_email='mayo@oyam.ca',
@@ -25,10 +30,26 @@ setup(name='hana',
     classifiers=[
         'Development Status :: 3 - Alpha',
 
+        'Environment :: Console',
+
+        'Intended Audience :: Developers',
+        'Intended Audience :: End Users/Desktop',
+        'Intended Audience :: System Administrators',
+
         'License :: OSI Approved :: MIT License',
 
-        'Programming Language :: Python :: 2',
-#        'Programming Language :: Python :: 3',
+        'Operating System :: MacOS :: MacOS X',
+        'Operating System :: Microsoft :: Windows',
+        'Operating System :: POSIX',
+        'Operating System :: Unix',
+
+        'Programming Language :: Python',
+
+        'Topic :: Internet',
+        'Topic :: Internet :: WWW/HTTP :: Site Management',
+        'Topic :: Software Development',
+        'Topic :: Software Development :: Build Tools',
+        'Topic :: Software Development :: Code Generators',
     ],
 
     keywords='hana static site generator processing file',
