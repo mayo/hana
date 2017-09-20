@@ -10,7 +10,7 @@ with open(path.join(basedir, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(name='hana',
-    version='0.0.1dev',
+    version='0.0.3dev',
 
     description='Static site generator',
     long_description=long_description,
