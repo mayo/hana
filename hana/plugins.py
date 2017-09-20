@@ -13,16 +13,17 @@ class FileLoader():
         if not os.path.isdir(self._source_path):
             raise SourceDirectoryError()
 
-    def __call__(self, files, hana):
+    def __call__(self, file_gen, hana):
 
         for path, dirs, sfiles in os.walk(self._source_path):
             for f in sfiles:
                 source = os.path.join(path, f)
                 filepath = os.path.relpath(source, self._source_path)
 
+                files = list(file_gen)
                 if filepath in files:
                     raise FileExistsError("File {} already exists".format(filepath))
-                files[filepath] = MetaFile(source, source_file=source)
+                hana.files[filepath] = MetaFile(source, _source_file=source)
 
     class FileLoaderError(HanaPluginError): pass
     class FileExistsError(FileLoaderError): pass
@@ -34,7 +35,7 @@ class FileLoader():
 #TODO: this should probably become the set_metadata plugin from build.py. This should be handled from initial configuration
 def metadata(metadata):
     print 'loading metadata'
-    def metadata_plugin(files, hana):
+    def metadata_plugin(file_gen, hana):
         hana.metadata.update(metadata)
 
     return metadata_plugin
@@ -43,17 +44,17 @@ def metadata(metadata):
 
 import frontmatter
 
-def front_matter(files, hana):
+def front_matter(file_gen, hana):
 
-    for f in files.itervalues():
+    for filename, f in file_gen:
         if f.is_binary:
             continue
 
         # This will strip empty front matter statement
-        metadata, f['contents'] = frontmatter.parse(f['contents'])
+        metadata, hana.files[filename]['contents'] = frontmatter.parse(f['contents'])
 
         if metadata:
-            f.update(metadata)
+            hana.files[filename].update(metadata)
 
 #Ignore files plugin
 
@@ -62,11 +63,12 @@ import pathspec
 def ignore(patterns):
     spec = pathspec.PathSpec.from_lines('gitwildmatch', patterns)
 
-    def ignore_plugin(files, hana):
-        matches = spec.match_files(files.iterkeys())
+    def ignore_plugin(file_gen, hana):
+        #matches = spec.match_files(files.iterkeys())
+        matches = spec.match_files(( f[0] for f, _ in file_gen ))
 
         for f in matches:
-            del files[f]
+            del hana.files[f]
 
     return ignore_plugin
 
@@ -84,7 +86,7 @@ import shutil
 
 def asset(assets):
 
-    def asset_plugin(files, hana):
+    def asset_plugin(file_gen, hana):
         for asset in assets:
             src = asset.get('src')
             dst = asset.get('dst')
@@ -126,10 +128,10 @@ class InvalidAssetDefinitionError(HanaPluginError): pass
 
 # Drafts
 
-def drafts(files, hana):
-    for f in files.itervalues():
+def drafts(file_gen, hana):
+    for f, _ in file_gen:
         if 'draft' in f:
-            del files[f]
+            del hana.files[f]
 
 
 # Markdown
@@ -165,20 +167,19 @@ class Markdown():
         )
 
 
-    def __call__(self, files, hana):
+    def __call__(self, file_gen, hana):
         md_re = re.compile(r'\.(md|markdown)$')
 
-        for filename, f in list(files.items()):
+        for filename, f in file_gen:
             if not md_re.search(filename):
                 continue
 
-            del files[filename]
+            del hana.files[filename]
 
-            #TODO: changes output file name
             file_basename, _ = os.path.splitext(filename)
             filename = "{:s}{:s}".format(file_basename, self.output_extension)
 
-            files[filename] = f
+            hana.files[filename] = f
 
             f['contents'] = self.md.convert(f['contents'])
 
@@ -196,8 +197,8 @@ def title(remove=False):
 
     md_pattern = re.compile(r'^\s*#\s*([^n]+?) *#* *(?:\n+|$)')
 
-    def title_plugin(files, hana):
-        for filename, f in files.iteritems():
+    def title_plugin(file_gen, hana):
+        for filename, f in file_gen:
             if 'title' in f:
                 continue
 
@@ -230,10 +231,10 @@ from bs4 import BeautifulSoup
 from bs4 import SoupStrainer
 import pathspec
 
-def excerpt(files, hana):
+def excerpt(file_gen, hana):
     match = pathspec.PathSpec.from_lines('gitwildmatch', ['*.htm', '*.html']).match_file
 
-    for filename, f in files.iteritems():
+    for filename, f in file_gen:
         if not match(filename):
             continue
 
@@ -269,7 +270,7 @@ class Branch():
 
         self.plugins = []
 
-    def __call__(self, files, hana):
+    def __call__(self, file_gen, hana):
         #TODO
         pass
 
@@ -306,8 +307,8 @@ class JinjaTemplate():
         #if jinja_filters:
         #    jinja_filters.register(self.env)
 
-    def __call__(self, files, hana):
-        for filename, f in files.iteritems():
+    def __call__(self, file_gen, hana):
+        for filename, f in file_gen:
             #TODO: process only files matching pattern, if given
             #TODO: process only if template is defined or there is a default defined
 
@@ -354,9 +355,10 @@ class Collections():
 
                 self.patterns[c_name] = pathspec.PathSpec.from_lines('gitwildmatch', pats)
 
-    def __call__(self, files, hana):
+    def __call__(self, file_gen, hana):
 
-        for filename, f in files.iteritems():
+        for filename, f in file_gen:
+            print f
             #TODO: this should probably be taken care of globally
             #TODO: metafile experiment
             f['path'] = filename
@@ -416,8 +418,8 @@ class Collections():
 
                 # set the default collection as global prev/next
                 if key in self.config and self.config[key].get('default', False):
-                    files[coll[idx-1]['path']]['next'] = next_item
-                    files[post['path']]['previous'] = prev_item
+                    hana.files[coll[idx-1]['path']]['next'] = next_item
+                    hana.files[post['path']]['previous'] = prev_item
 
 
             hana.metadata['collections'][key] = coll
@@ -432,23 +434,23 @@ class PrettyUrl():
     def __init__(self, relative=True, index_file='index.html'):
         self.index_file = index_file
 
-    def __call__(self, files, hana):
+    def __call__(self, file_gen, hana):
         html_re = re.compile(r'\.(htm|html)$')
 
-        for filename, f in list(files.items()):
+        for filename, f in file_gen:
             if not html_re.search(filename):
                 continue
 
             if not f.get('permalink', True):
                 continue
 
-            del files[filename]
+            del hana.files[filename]
 
             path, _ = os.path.splitext(filename)
             path = os.path.join(path, self.index_file)
             print path
 
-            files[path] = f
+            hana.files[path] = f
             f.permalink = True
 
 
@@ -462,8 +464,8 @@ import re
 def beautify(indent_size=4, indent_char=" "):
     html_re = re.compile(r'\.(htm|html)$')
 
-    def beautify_plugin(files, hana):
-        for filename, f in files.iteritems():
+    def beautify_plugin(file_gen, hana):
+        for filename, f in file_gen:
 
             if not html_re.search(filename):
                 continue

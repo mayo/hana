@@ -58,31 +58,47 @@ class Hana():
 
     def _process(self):
         for plugin, patterns in self.plugins:
-            files = self.files
-            keys = None
+            #files = self.files
+            #keys = None
+
+            def file_gen(pattern):
+                pat = None
+
+                if pattern:
+                    pat = pathspec.PathSpec.from_lines('gitwildmatch', pattern)
+
+                for k in self.files:
+                    if pat:
+                        if pat.match_file(k):
+                            yield (k, self.files[k])
+                    else:
+                        yield (k, self.files[k])
+
+            plugin(file_gen(patterns), self)
+
 
             # Make a file subset
-            if patterns:
-                match = pathspec.PathSpec.from_lines('gitwildmatch', patterns).match_file
-                files = { k:files[k] for k in files if match(k) }
-                keys = set(files.keys())
+            #if patterns:
+            #    match = pathspec.PathSpec.from_lines('gitwildmatch', patterns).match_file
+            #    files = { k:files[k] for k in files if match(k) }
+            #    keys = set(files.keys())
 
-            # Execute plugin with file subset
-            plugin(files, self)
+            ## Execute plugin with file subset
+            #plugin(files, self)
 
-            # Update master file list
-            #TODO: there has to be a better way
-            if patterns:
-                new_keys = set(files.keys())
+            ## Update master file list
+            ##TODO: there has to be a better way
+            #if patterns:
+            #    new_keys = set(files.keys())
 
-                deleted_keys = keys - new_keys
-                new_keys = new_keys - keys
+            #    deleted_keys = keys - new_keys
+            #    new_keys = new_keys - keys
 
-                for k in deleted_keys:
-                    del self.files[k]
+            #    for k in deleted_keys:
+            #        del self.files[k]
 
-                for k in new_keys:
-                    self.files[k] = files[k]
+            #    for k in new_keys:
+            #        self.files[k] = files[k]
 
     def _write(self):
         for filename, f in self.files.iteritems():
@@ -152,7 +168,7 @@ class FileSet():
 #TODO: create source-less file that has _loaded set to true to avoid loading
 
 # NEW NOTES AS OF Sept 13
-# - there should be no such things as output_file. There should be source_file (if one is present) and filename, which is used for everything else. Initially, MetaFile that is source file backed will have filename set to source_file.
+# Initially, MetaFile that is source file backed will have filename set to source_file.
 
 class MetaFile(dict):
     READ_ONLY_KEYS = [] #'filename']
