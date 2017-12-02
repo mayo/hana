@@ -5,24 +5,32 @@ from errors import HanaPluginError
 # FileLoader plugin
 
 from hana.core import MetaFile
+import pathspec
 
 class FileLoader():
-    def __init__(self, source_path):
+    def __init__(self, source_path, ignore_patterns=[]):
         self._source_path = source_path
+        self.ignore_patterns = ignore_patterns
 
         if not os.path.isdir(self._source_path):
             raise SourceDirectoryError()
 
     def __call__(self, files, hana):
+        ignore_spec = pathspec.PathSpec.from_lines('gitwildmatch', self.ignore_patterns)
 
         for path, dirs, sfiles in os.walk(self._source_path):
             for f in sfiles:
                 source = os.path.join(path, f)
+
+                if ignore_spec.match_file(f):
+                    continue
+
                 filepath = os.path.relpath(source, self._source_path)
 
                 if filepath in files:
                     raise FileExistsError("File {} already exists".format(filepath))
-                files[filepath] = MetaFile(source, source_file=source)
+
+                files.add(filepath, MetaFile(source, _source_file=source))
 
     class FileLoaderError(HanaPluginError): pass
     class FileExistsError(FileLoaderError): pass
@@ -45,7 +53,7 @@ import frontmatter
 
 def front_matter(files, hana):
 
-    for f in files.itervalues():
+    for _, f in files:
         if f.is_binary:
             continue
 
@@ -63,10 +71,11 @@ def ignore(patterns):
     spec = pathspec.PathSpec.from_lines('gitwildmatch', patterns)
 
     def ignore_plugin(files, hana):
-        matches = spec.match_files(files.iterkeys())
+        matches = spec.match_files(files.filenames())
 
         for f in matches:
-            del files[f]
+            print 'ignore ', f
+            files.remove(f)
 
     return ignore_plugin
 
@@ -127,9 +136,9 @@ class InvalidAssetDefinitionError(HanaPluginError): pass
 # Drafts
 
 def drafts(files, hana):
-    for f in files.itervalues():
+    for filename, f in files:
         if 'draft' in f:
-            del files[f]
+            files.remove(filename)
 
 
 # Markdown
@@ -168,17 +177,17 @@ class Markdown():
     def __call__(self, files, hana):
         md_re = re.compile(r'\.(md|markdown)$')
 
-        for filename, f in list(files.items()):
+        for filename, f in files:
+            if 'index.' in filename or 'DS_Store' in filename:
+                print 'markdown ', filename
+
             if not md_re.search(filename):
                 continue
 
-            del files[filename]
-
-            #TODO: changes output file name
             file_basename, _ = os.path.splitext(filename)
-            filename = "{:s}{:s}".format(file_basename, self.output_extension)
+            new_name = "{:s}{:s}".format(file_basename, self.output_extension)
 
-            files[filename] = f
+            files.rename(filename, new_name)
 
             f['contents'] = self.md.convert(f['contents'])
 
@@ -197,16 +206,17 @@ def title(remove=False):
     md_pattern = re.compile(r'^\s*#\s*([^n]+?) *#* *(?:\n+|$)')
 
     def title_plugin(files, hana):
-        for filename, f in files.iteritems():
+        for filename, f in files:
             if 'title' in f:
                 continue
 
             title = None
 
-            if re.search(r'\.(md|markdown)$', filename):
+            if md_re.search(filename):
+                #FIXME - doesn't do anything with the match
                 match = md_pattern.match(f['contents'])
 
-            if re.search(r'\.(html|htm)$', filename):
+            if html_re.search(filename):
                 h1_tags = SoupStrainer('h1')
                 soup = BeautifulSoup(f['contents'], 'html.parser', parse_only=p_tags)
 
@@ -233,7 +243,7 @@ import pathspec
 def excerpt(files, hana):
     match = pathspec.PathSpec.from_lines('gitwildmatch', ['*.htm', '*.html']).match_file
 
-    for filename, f in files.iteritems():
+    for filename, f in files:
         if not match(filename):
             continue
 
@@ -278,6 +288,7 @@ class Branch():
 
 from jinja2 import Environment, FileSystemLoader
 from jinja2.ext import Extension
+import jinja2.exceptions
 
 class JinjaTemplate():
     def __init__(self, config={}):
@@ -307,26 +318,33 @@ class JinjaTemplate():
         #    jinja_filters.register(self.env)
 
     def __call__(self, files, hana):
-        for filename, f in files.iteritems():
-            #TODO: process only files matching pattern, if given
-            #TODO: process only if template is defined or there is a default defined
+        #print 'Jinja IS THERE: ', 'content/blog/2008/.DS_Store' in file_gen
+        #TODO: this somehow fixes an issue where files are iterated through that no longer exist
+
+        for filename, f in files:
+            if 'index.' in filename:
+                print 'jinja ', filename
 
             if 'template' in f:
-
-                c = self.render(f, hana)
+                c = self.render(filename, f, hana)
                 f['contents'] = unicode(c)
 
-    def render(self, node, hana):
-        tpl = node.get('template')
+    def render(self, filename, f, hana):
+        tpl = f.get('template')
         template = None
 
         if tpl == True:
             #TODO: this doesn't give great feedback if there is an error in the template. The error wil be tracable to the template that got extended. Ideally we should identify where the string we are using as template came from
-            template = self.env.from_string(node['contents'])
+            template = self.env.from_string(f['contents'])
         else:
             template = self.env.get_template(tpl)
 
-        return template.render(site=hana.metadata, page=node)
+        try:
+            return template.render(site=hana.metadata, page=f)
+        except jinja2.exceptions.UndefinedError as e:
+            print filename
+            print f
+            raise
 
 
 # Collections
@@ -356,7 +374,8 @@ class Collections():
 
     def __call__(self, files, hana):
 
-        for filename, f in files.iteritems():
+        for filename, f in files:
+            #print f
             #TODO: this should probably be taken care of globally
             #TODO: metafile experiment
             f['path'] = filename
@@ -435,20 +454,19 @@ class PrettyUrl():
     def __call__(self, files, hana):
         html_re = re.compile(r'\.(htm|html)$')
 
-        for filename, f in list(files.items()):
+        for filename, f in files:
             if not html_re.search(filename):
                 continue
 
             if not f.get('permalink', True):
                 continue
 
-            del files[filename]
-
             path, _ = os.path.splitext(filename)
             path = os.path.join(path, self.index_file)
-            print path
+            #print path
 
-            files[path] = f
+            files.rename(filename, path)
+            #TODO: Is this supposed to be attribute or metadata?
             f.permalink = True
 
 
@@ -463,7 +481,7 @@ def beautify(indent_size=4, indent_char=" "):
     html_re = re.compile(r'\.(htm|html)$')
 
     def beautify_plugin(files, hana):
-        for filename, f in files.iteritems():
+        for filename, f in files:
 
             if not html_re.search(filename):
                 continue
