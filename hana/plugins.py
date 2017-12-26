@@ -4,13 +4,14 @@ from errors import HanaPluginError
 
 # FileLoader plugin
 
-from hana.core import MetaFile
+from hana.core import FSFile
 import pathspec
 
 class FileLoader():
-    def __init__(self, source_path, ignore_patterns=[]):
+    def __init__(self, source_path, ignore_patterns=[], source_file_keyword=None):
         self._source_path = source_path
         self.ignore_patterns = ignore_patterns
+        self.source_file_keyword = source_file_keyword
 
         if not os.path.isdir(self._source_path):
             raise SourceDirectoryError()
@@ -30,7 +31,12 @@ class FileLoader():
                 if filepath in files:
                     raise FileExistsError("File {} already exists".format(filepath))
 
-                files.add(filepath, MetaFile(source, _source_file=source))
+                metadata = {}
+
+                if self.source_file_keyword:
+                    metadata[self.source_file_keyword] = source
+
+                files.add(filepath, FSFile(source, **metadata))
 
     class FileLoaderError(HanaPluginError): pass
     class FileExistsError(FileLoaderError): pass
@@ -261,34 +267,30 @@ def excerpt(files, hana):
         f['excerpt'] = p
 
 
-# Branch
-
-import pathspec
-
-class Branch():
-
-    def __init__(self, qualifier):
-        if isinstance(qualifier, str):
-            qualifier = [qualifier]
-
-        if callable(filter):
-            #TODO
-            pass
-
-        self.match = pathspec.PathSpec.from_lines('gitwildmatch', qualifier).match_file
-
-        self.plugins = []
-
-    def __call__(self, files, hana):
-        #TODO
-        pass
-
-
 # Jinja
 
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import evalcontextfilter, Environment, FileSystemLoader, Markup
 from jinja2.ext import Extension
 import jinja2.exceptions
+
+# tojson filter in jinja sucks
+import json
+@evalcontextfilter
+def jinja_json(eval_ctx, value, indent=None):
+    policies = eval_ctx.environment.policies
+    dumper = policies['json.dumps_function']
+    options = policies['json.dumps_kwargs']
+
+    if indent is not None:
+        options = dict(options)
+        options['indent'] = indent
+
+    if dumper is None:
+        dumper = json.dumps
+
+    rv = dumper(value, **options)
+
+    return Markup(rv)
 
 class JinjaTemplate():
     def __init__(self, config={}):
@@ -303,11 +305,20 @@ class JinjaTemplate():
             'jinja2.ext.loopcontrols',
         ]
 
+        self.config = {
+            'extends_block': None,
+        }
+
+        self.config.update(config)
+
         self.env = Environment(loader=FileSystemLoader(tplPath),
                 extensions=extensions)
 
         self.env.trim_blocks = True
         self.env.lstrip_blocks = True
+
+        #TODO: adding custom filters
+        self.env.filters['json'] = jinja_json
 
         #try:
         #    from typogrify.templatetags import jinja_filters
@@ -324,6 +335,21 @@ class JinjaTemplate():
         for filename, f in files:
             if 'index.' in filename:
                 print 'jinja ', filename
+
+            #TODO: this is not the nicest way of doing things... jekyll need it?
+            if 'extends' in f and not 'template' in f:
+                block_name = None
+
+                if 'extends-block' in f:
+                    block_name = f['extends-block']
+                elif self.config['extends-block']:
+                    block_name = self.config['extends-block']
+                else:
+                    raise Exception('missing extends block')
+
+                f['template'] = True
+                f['contents'] = "{{% extends '{:s}' %}}{{% block {:s} %}}{:s}{{% endblock %}}".format(f['extends'], block_name, f['contents'])
+
 
             if 'template' in f:
                 c = self.render(filename, f, hana)
@@ -342,7 +368,7 @@ class JinjaTemplate():
         try:
             return template.render(site=hana.metadata, page=f)
         except jinja2.exceptions.UndefinedError as e:
-            print filename
+            print 'Jinja Debug', filename
             print f
             raise
 

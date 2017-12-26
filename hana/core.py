@@ -7,9 +7,6 @@ import pathspec
 
 from hana import errors
 
-#TODO: build in file watcher, server...
-#TODO: setup logging
-#TODO: plugins directory to put on path for ad-hoc plugins?
 
 class Hana():
 
@@ -27,11 +24,6 @@ class Hana():
         self.metadata = {}
 
         self.files = FileSet()
-
-    @property
-    def files(self):
-        #TODO: change to file manager
-        return MetaFile._all_files
 
     def _load_configuration(config_file):
         #TODO: load config
@@ -104,7 +96,6 @@ class Hana():
 
 #TODO: fileset to make filtering more easier. Filter files based on glob pattern, so in plugins:
 #files.filter(glob) returns iterator/generator with matches
-#TODO: support dictionary/list-like iteration so behave like current implementation
 #TODO: this is not ideal and error prone, as it sub-calls .add, etc. This should really return a proxy that's smart enough to iterate through matching items, rather than recursively call action methods.
 class FileSet():
 
@@ -134,7 +125,6 @@ class FileSet():
         """Return FileSet with subset of files
         """
 
-
         if not patterns:
             return self
 
@@ -148,7 +138,6 @@ class FileSet():
 
         return fm
 
-    #def push
     #TODO: verify base path, resolve relative paths
     def add(self, filename, f):
         self._files[filename] = f
@@ -156,7 +145,6 @@ class FileSet():
         if self._parent:
             self._parent.add(filename, f)
 
-    #def pop
     #TODO: verify base path, resolve relative paths
     def remove(self, filename):
         self._files.pop(filename)
@@ -178,21 +166,53 @@ class FileSetProxy(object):
 
 
 
-#TODO: create source-less file class that has loaded set to true to avoid loading
-
-# NEW NOTES AS OF Sept 13
-# Initially, MetaFile that is source file backed will have filename set to source_file.
-#
 class File(dict):
 
     def __init__(self, *args, **kwargs):
+        super(File, self).update(*args, **kwargs)
+
+    def __repr__(self):
+        return '<%s %s>' % (self.__class__.__name__, dict(self))
+
+    @property
+    def is_binary(self):
+        # If we don't have any content, treat it as binary and try to do detection later
+        if not self['contents']:
+            return True
+
+        return '\0' in self['contents']
+
+    def update(self, *args, **kwargs):
+        if args:
+            if len(args) > 1:
+                raise TypeError("update expected at most 1 arguments, "
+                                "got %d" % len(args))
+
+            other = dict(args[0])
+
+            for key in other:
+                self[key] = other[key]
+
+        for key in kwargs:
+            self[key] = kwargs[key]
+
+    def setdefault(self, key, value=None):
+        if key not in self:
+            self[key] = value
+        return self[key]
+
+
+class FSFile(File):
+
+    def __init__(self, filename, *args, **kwargs):
+        super(FSFile, self).__init__(*args, **kwargs)
+
+        if not filename:
+            raise
+
         self._is_binary = None
         self.loaded = False
-
-        if 'content' in kwargs:
-            self.loaded = True
-
-        super(File, self).update(*args, **kwargs)
+        self.filename = filename
 
     def __getitem__(self, key):
         if key == 'contents' and not self.loaded:
@@ -200,16 +220,16 @@ class File(dict):
 
         return super(File, self).__getitem__(key)
 
-    def __repr__(self):
-        return '<%s %s>' % (self.__class__.__name__, dict(self))
-
+    # Override is_binary to avoid loading files unnecesarily
     @property
     def is_binary(self):
-        #TODO: if source file is not defined, but we have content, use that instead of reading a file. If neither exists, treat it as binary
-        #NOTE: once using contents, this should not be cached as contents can change on the fly
-        if self._is_binary is None:
+        # If the file is already loaded, it may have been processed
+        if self.loaded:
+            self._is_binary = None
+            return '\0' in self['contents']
 
-            with open(self.source_file, 'rb') as fin:
+        if self._is_binary is None:
+            with open(self.filename, 'rb') as fin:
                 CHUNKSIZE = 1024
 
                 while True:
@@ -225,43 +245,15 @@ class File(dict):
 
         return self._is_binary
 
-
-    def update(self, *args, **kwargs):
-        if args:
-            if len(args) > 1:
-                raise TypeError("update expected at most 1 arguments, "
-                                "got %d" % len(args))
-            other = dict(args[0])
-            for key in other:
-                self[key] = other[key]
-        for key in kwargs:
-            self[key] = kwargs[key]
-
-    def setdefault(self, key, value=None):
-        if key not in self:
-            self[key] = value
-        return self[key]
-
-
-#TODO: clean this up with File
-class MetaFile(File):
-
-    def __init__(self, filename, *args, **kwargs):
-        super(MetaFile, self).__init__(*args, **kwargs)
-
-        #Keep track of source file
-        self.source_file = filename
-
-    #TODO: this is called from __getitem__
     def _get_contents(self):
-        #TODO: raise if 'filename' is not defined
         #print 'r%s %s' % ('b' if self.is_binary else 't', self['filename'])
         if self.is_binary:
-            self['contents'] = open(self.source_file, 'r').read()
+            self['contents'] = open(self.filename, 'rb').read()
+
         else:
-            self['contents'] = codecs.open(self.source_file, 'r', 'utf-8').read()
+            self['contents'] = codecs.open(self.filename, 'r', 'utf-8').read()
 
         self.loaded = True
 
     def __repr__(self):
-        return '<%s %s %s>' % (self.__class__.__name__, self.source_file, dict(self))
+        return '<%s %s %s>' % (self.__class__.__name__, self.filename, dict(self))
