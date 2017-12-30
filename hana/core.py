@@ -1,21 +1,30 @@
-#!/usr/bin/env python
-
 import codecs
-import os
-import shutil
-import pathspec
-
 from hana import errors
+import importlib
+import logging
+import pathspec
+import pkg_resources
+import sys
+import yaml
+
+#TODO: this probably shouldn't be here
+root_logger = logging.getLogger()
+
+if not root_logger.handlers:
+    root_logger.setLevel(logging.DEBUG)
+    ch = logging.StreamHandler(sys.stdout)
+    ch.setLevel(logging.DEBUG)
+    root_logger.addHandler(ch)
 
 
 class Hana():
 
-    def __init__(self, configuration=None, output_directory=None):
+    def __init__(self, configuration=None):
+        self.logger = logging.getLogger(self.__module__)
+
         # Load configuration first, any parameters override config
         if configuration:
             self._load_configuration(configuration)
-
-        self._output = output_directory
 
         # Validate configuration
         self._validate_configuration()
@@ -25,17 +34,50 @@ class Hana():
 
         self.files = FileSet()
 
-    def _load_configuration(config_file):
-        #TODO: load config
-        pass
+    def _load_configuration(self, config_file):
+        self.logger.info('Loading configuration from "{}"'.format(config_file))
+        config = yaml.safe_load(open(config_file))
+
+        if 'plugin_path' in config:
+            #TODO: add plugin path on path
+            pass
+
+        plugins = config.get('plugins')
+        if plugins:
+            self._load_plugins(plugins)
 
     def _validate_configuration(self):
-        if not self.output:
-            raise errors.HanaMissingOutputDirectoryError()
+        #TODO
+        pass
 
-    @property
-    def output(self):
-        return self._output
+    def _load_plugins(self, plugins):
+        self.logger.info('Loading plugins')
+        target = None
+        package = None
+
+        # Collect all entrypoints for plugins
+        available_plugins = { e.name: e for e in pkg_resources.iter_entry_points(group='hana.plugins') }
+
+        # Collect configured plugins
+        wanted_plugins = set([ p.keys()[0] for p in plugins ])
+
+        # Fail early for missing plugins
+        missing_plugins = wanted_plugins - set(available_plugins.keys())
+        if missing_plugins:
+            raise errors.PluginNotFoundError('Missing plugins: "{}" not found'.format(missing_plugins))
+
+        # Iterate plugins and make new instances
+        for plugin_spec in plugins:
+            plugin_name, plugin_config = plugin_spec.items()[0]
+
+            # Get the plugin callable
+            plugin = available_plugins[plugin_name].load()
+
+            # Initialize the plugin if requested or if parameters passed
+            if plugin_config.get('init', False) or 'parameters' in plugin_config:
+                plugin = plugin(**plugin_config.get('parameters'))
+
+            self.plugin(plugin, plugin_config.get('patterns'))
 
     def plugin(self, plugin, pattern=None):
         if isinstance(pattern, str):
@@ -43,56 +85,12 @@ class Hana():
 
         self.plugins.append((plugin, pattern))
 
-    def build(self, clean=False):
-        if clean and os.path.isdir(self.output):
-            self._clean_output_dir()
-
+    def build(self):
         self._process()
-
-        if not os.path.isdir(self.output):
-            self._create_output_dir()
-
-        self._write()
-
-    def _clean_output_dir(self):
-        #TODO: see if we can avoid removing the dir itself
-        shutil.rmtree(self.output)
-        self._create_output_dir()
-
-    def _create_output_dir(self):
-        os.mkdir(self.output)
-
 
     def _process(self):
         for plugin, patterns in self.plugins:
             plugin(self.files.filter(patterns), self)
-
-    def _write(self):
-        for filename, f in self.files:
-            output_path = os.path.join(self.output, filename)
-
-            def makedirs(path, dir):
-                if not dir:
-                    return
-
-                if os.path.isdir(os.path.join(self.output, path, dir)):
-                    return
-
-                makedirs(*os.path.split(path))
-
-                if os.path.isdir(os.path.join(self.output, path)) or path == '':
-                    dirpath = os.path.join(self.output, path, dir)
-                    os.mkdir(dirpath)
-                    return
-
-            makedirs(*os.path.split(os.path.dirname(filename)))
-
-            print 'w%s %s' % ('b' if f.is_binary else 't', output_path)
-            if not f.is_binary:
-                codecs.open(output_path, 'w', 'utf-8').write(f['contents'])
-            else:
-                open(output_path, 'wb').write(f['contents'])
-
 
 #TODO: fileset to make filtering more easier. Filter files based on glob pattern, so in plugins:
 #files.filter(glob) returns iterator/generator with matches
@@ -225,6 +223,7 @@ class FSFile(File):
     def is_binary(self):
         # If the file is already loaded, it may have been processed
         if self.loaded:
+            #TODO: call super.is_binary?
             self._is_binary = None
             return '\0' in self['contents']
 
@@ -246,7 +245,6 @@ class FSFile(File):
         return self._is_binary
 
     def _get_contents(self):
-        #print 'r%s %s' % ('b' if self.is_binary else 't', self['filename'])
         if self.is_binary:
             self['contents'] = open(self.filename, 'rb').read()
 
@@ -257,3 +255,4 @@ class FSFile(File):
 
     def __repr__(self):
         return '<%s %s %s>' % (self.__class__.__name__, self.filename, dict(self))
+

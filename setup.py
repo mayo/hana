@@ -10,13 +10,12 @@ with open(path.join(basedir, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(name='hana',
-    version='0.0.3dev',
+    version='0.0.dev5',
 
     description='Static site generator',
     long_description=long_description,
 
     install_requires=[
-        'python-frontmatter>=0.4.2',
         'pathspec>=0.5.2',
     ],
 
@@ -54,12 +53,19 @@ setup(name='hana',
 
     keywords='hana static site generator processing file',
 
-    packages=['hana'],
+    packages=[
+        'hana',
+        'hana.plugins'
+    ],
 
-#    entry_points={
+    entry_points={
 #        'console_scripts': [
 #            'hana = hana.core:main',
-#        ]
-#    }
+#        ],
+        'hana.plugins': [
+            'file_loader = hana.plugins.file_loader.FileLoader',
+            'file_writer = hana.plugins.file_writer.FileWriter',
+        ]
+    }
 )
 
