@@ -2,6 +2,7 @@ import codecs
 from hana import errors
 import importlib
 import logging
+import os.path
 import pathspec
 import pkg_resources
 import sys
@@ -9,7 +10,6 @@ import yaml
 
 #TODO: this probably shouldn't be here
 root_logger = logging.getLogger()
-
 if not root_logger.handlers:
     root_logger.setLevel(logging.DEBUG)
     ch = logging.StreamHandler(sys.stdout)
@@ -26,9 +26,6 @@ class Hana():
         if configuration:
             self._load_configuration(configuration)
 
-        # Validate configuration
-        self._validate_configuration()
-
         self.plugins = []
         self.metadata = {}
 
@@ -38,28 +35,53 @@ class Hana():
         self.logger.info('Loading configuration from "{}"'.format(config_file))
         config = yaml.safe_load(open(config_file))
 
-        if 'plugin_path' in config:
-            #TODO: add plugin path on path
-            pass
+        plugins_directory = config.get('plugins_directory')
+        if plugins_directory:
+            self._setup_plugins(plugins_directory)
 
         plugins = config.get('plugins')
         if plugins:
             self._load_plugins(plugins)
 
-    def _validate_configuration(self):
-        #TODO
-        pass
+    def _setup_plugins(self, plugins_directory):
+        if not os.path.isdir(plugins_directory):
+            raise errors.InvalidPluginsDirectory()
+
+        #TODO: load plugins somehow... how do we discover custom plugins vs installed plugins. command plugins vs normal plugins, ... can we do entry points with modules? Not all plugins from plugins_directory should be loaded, only the required ones
+        #try:
+        #    fp, filename, description = imp.find_module(self.module_name, [plugins_directory])
+        #except ImportError as err:
+        #    raise errors.PluginNotFoundError('Missing plugins: "{}" not found'.format(missing_plugins))
+        #        raise
+
+        ## Load the module
+        #try:
+        #    module_obj = imp.load_module(self.module_name, fp, filename, description)
+        #except Exception as err:
+        #    self.log.exception('Failed to load module "{module:s}" from file "{path:s}": {err:s}'.format(
+        #        module=self.module_name, path=self.module_path, err=err))
+        #    raise
+        #finally:
+        #    fp.close()
+
+        #self.module_bytecode = getattr(module_obj, self.module_name)
+
+        ## Update where the module was loaded from
+        #self.module_path = os.path.join(MODULES_PATH, filename)
+
+        #self.module_instance = self.module_bytecode()
+
 
     def _load_plugins(self, plugins):
         self.logger.info('Loading plugins')
         target = None
         package = None
 
-        # Collect all entrypoints for plugins
-        available_plugins = { e.name: e for e in pkg_resources.iter_entry_points(group='hana.plugins') }
-
         # Collect configured plugins
         wanted_plugins = set([ p.keys()[0] for p in plugins ])
+
+        # Collect all entrypoints for plugins
+        available_plugins = { e.name: e for e in pkg_resources.iter_entry_points(group='hana.plugins') }
 
         # Fail early for missing plugins
         missing_plugins = wanted_plugins - set(available_plugins.keys())
