@@ -6,7 +6,6 @@ python:
 install:
 - pip install .
 - pip install -r requirements.txt
-- pip install -r dev-requirements.txt
 script: pytest test/
 deploy:
   provider: pypi
