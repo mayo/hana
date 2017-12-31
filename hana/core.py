@@ -192,7 +192,7 @@ class File(dict):
         super(File, self).update(*args, **kwargs)
 
     def __repr__(self):
-        return '<%s %s>' % (self.__class__.__name__, dict(self))
+        return '<{} {}>'.format(self.__class__.__name__, dict(self))
 
     @property
     def is_binary(self):
@@ -206,7 +206,7 @@ class File(dict):
         if args:
             if len(args) > 1:
                 raise TypeError("update expected at most 1 arguments, "
-                                "got %d" % len(args))
+                        "got {:d}".format(len(args)))
 
             other = dict(args[0])
 
@@ -276,5 +276,5 @@ class FSFile(File):
         self.loaded = True
 
     def __repr__(self):
-        return '<%s %s %s>' % (self.__class__.__name__, self.filename, dict(self))
+        return '<{} {} {}>'.format(self.__class__.__name__, self.filename, dict(self))
 
