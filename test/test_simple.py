@@ -1,34 +1,28 @@
 import pytest
 import hana
+import hana.plugins.file_loader
+import hana.plugins.file_writer
 
 #TODO: test absolute paths
 #TODO: test relative paths
 def test_validation():
-    with pytest.raises(hana.errors.HanaMissingSourceDirectoryError):
-        b = hana.Hana(source=None)
+    with pytest.raises(hana.plugins.file_loader.SourceDirectoryError):
+        b = hana.Hana()
+        b.plugin(hana.plugins.file_loader.FileLoader(source_path='nonexistent_directory'))
+        b.build()
 
-    with pytest.raises(hana.errors.HanaMissingOutputDirectoryError):
-        b = hana.Hana(source='test/simple', output=None)
+    with pytest.raises(hana.plugins.file_writer.DeployDirectoryError):
+        b = hana.Hana()
+        b.plugin(hana.plugins.file_writer.FileWriter(deploy_path='nonexistent_directory'))
+        b.build()
 
 def test_simple():
-    b = hana.Hana(
-        source='test/simple',
-        output='test/out'
-    )
+    b = hana.Hana()
 
-    b.build(clean=True)
+    b.plugin(hana.plugins.file_loader.FileLoader(source_path='test/simple'))
+    b.plugin(hana.plugins.file_writer.FileWriter(deploy_path='test/out'))
 
-def test_use():
-    plugin_executed = {}
-
-    def plugin(files, hana):
-        plugin_executed['executed'] = True
-
-    b = hana.Hana(source='test/simple', output='test/out')
-    b.use(plugin).build(clean=True)
-
-    assert plugin_executed
-
+    b.build()
 
 def test_plugins():
     plugin_executed = {}
@@ -36,15 +30,9 @@ def test_plugins():
     def plugin(files, hana):
         plugin_executed['executed'] = True
 
-    b = hana.Hana(
-        source='test/simple',
-        output='test/out',
-        plugins=[
-            plugin
-        ]
-    )
-
-    b.build(clean=True)
+    b = hana.Hana()
+    b.plugin(plugin)
+    b.build()
 
     assert(plugin_executed)
 
