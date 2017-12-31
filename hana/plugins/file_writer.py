@@ -11,9 +11,6 @@ class FileWriter(object):
         self.clean = clean
         self.logger = logging.getLogger(self.__module__)
 
-        if not os.path.isdir(self._deploy_path):
-            raise DeployDirectoryError()
-
     def _clean_output_dir(self):
         #TODO: see if we can avoid removing the dir itself
         shutil.rmtree(self._deploy_path)
@@ -55,10 +52,9 @@ class FileWriter(object):
                 open(output_path, 'wb').write(f['contents'])
 
 
-
-class FileLoaderError(HanaPluginError):
-    pass
-
-class DeployDirectoryError(FileLoaderError):
-    pass
+#class FileLoaderError(HanaPluginError):
+#    pass
+#
+#class DeployDirectoryError(FileLoaderError):
+#    pass
 

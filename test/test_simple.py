@@ -11,11 +11,6 @@ def test_validation():
         b.plugin(hana.plugins.file_loader.FileLoader(source_path='nonexistent_directory'))
         b.build()
 
-    with pytest.raises(hana.plugins.file_writer.DeployDirectoryError):
-        b = hana.Hana()
-        b.plugin(hana.plugins.file_writer.FileWriter(deploy_path='nonexistent_directory'))
-        b.build()
-
 def test_simple():
     b = hana.Hana()
 
