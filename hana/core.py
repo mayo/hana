@@ -1,12 +1,14 @@
 import codecs
-from hana import errors
-import importlib
+#import importlib
 import logging
 import os.path
-import pathspec
-import pkg_resources
 import sys
 import yaml
+
+import pathspec
+import pkg_resources
+
+from hana import errors
 
 #TODO: this probably shouldn't be here
 root_logger = logging.getLogger()
@@ -17,7 +19,7 @@ if not root_logger.handlers:
     root_logger.addHandler(ch)
 
 
-class Hana():
+class Hana(object):
 
     def __init__(self, configuration=None):
         self.logger = logging.getLogger(self.__module__)
@@ -32,7 +34,7 @@ class Hana():
         self.files = FileSet()
 
     def _load_configuration(self, config_file):
-        self.logger.info('Loading configuration from "{}"'.format(config_file))
+        self.logger.info('Loading configuration from "%s"', config_file)
         config = yaml.safe_load(open(config_file))
 
         plugins_directory = config.get('plugins_directory')
@@ -47,12 +49,16 @@ class Hana():
         if not os.path.isdir(plugins_directory):
             raise errors.InvalidPluginsDirectory()
 
-        #TODO: load plugins somehow... how do we discover custom plugins vs installed plugins. command plugins vs normal plugins, ... can we do entry points with modules? Not all plugins from plugins_directory should be loaded, only the required ones
+        #TODO: load plugins somehow... how do we discover custom plugins vs installed plugins.
+        #      Command plugins vs normal plugins, ... can we do entry points with modules? Not
+        #      all plugins from plugins_directory should be loaded, only the required ones
+
         #try:
         #    fp, filename, description = imp.find_module(self.module_name, [plugins_directory])
         #except ImportError as err:
-        #    raise errors.PluginNotFoundError('Missing plugins: "{}" not found'.format(missing_plugins))
-        #        raise
+        #    raise errors.PluginNotFoundError(
+        #       'Missing plugins: "{}" not found'.format(missing_plugins)
+        #    )
 
         ## Load the module
         #try:
@@ -74,14 +80,12 @@ class Hana():
 
     def _load_plugins(self, plugins):
         self.logger.info('Loading plugins')
-        target = None
-        package = None
 
         # Collect configured plugins
-        wanted_plugins = set([ p.keys()[0] for p in plugins ])
+        wanted_plugins = set([p.keys()[0] for p in plugins])
 
         # Collect all entrypoints for plugins
-        available_plugins = { e.name: e for e in pkg_resources.iter_entry_points(group='hana.plugins') }
+        available_plugins = {e.name: e for e in pkg_resources.iter_entry_points(group='hana.plugins')}
 
         # Fail early for missing plugins
         missing_plugins = wanted_plugins - set(available_plugins.keys())
@@ -114,10 +118,13 @@ class Hana():
         for plugin, patterns in self.plugins:
             plugin(self.files.filter(patterns), self)
 
-#TODO: fileset to make filtering more easier. Filter files based on glob pattern, so in plugins:
+#TODO: Tileset to make filtering more easier.
+#      Filter files based on glob pattern, so in plugins:
 #files.filter(glob) returns iterator/generator with matches
-#TODO: this is not ideal and error prone, as it sub-calls .add, etc. This should really return a proxy that's smart enough to iterate through matching items, rather than recursively call action methods.
-class FileSet():
+#TODO: This is not ideal and error prone, as it sub-calls .add, etc.
+#      This should really return a proxy that's smart enough to iterate
+#      through matching items, rather than recursively call action methods.
+class FileSet(object):
 
     def __init__(self, parent=None):
         self._files = {}
@@ -189,6 +196,7 @@ class FileSetProxy(object):
 class File(dict):
 
     def __init__(self, *args, **kwargs):
+        super(File, self).__init__()
         super(File, self).update(*args, **kwargs)
 
     def __repr__(self):
@@ -206,7 +214,7 @@ class File(dict):
         if args:
             if len(args) > 1:
                 raise TypeError("update expected at most 1 arguments, "
-                        "got {:d}".format(len(args)))
+                                "got {:d}".format(len(args)))
 
             other = dict(args[0])
 
@@ -238,7 +246,7 @@ class FSFile(File):
         if key == 'contents' and not self.loaded:
             self._get_contents()
 
-        return super(File, self).__getitem__(key)
+        return super(FSFile, self).__getitem__(key)
 
     # Override is_binary to avoid loading files unnecesarily
     @property

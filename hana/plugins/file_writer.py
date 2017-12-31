@@ -1,11 +1,11 @@
 import codecs
-from hana.errors import HanaPluginError
 import logging
 import os
 import shutil
 
+from hana.errors import HanaPluginError
 
-class FileWriter():
+class FileWriter(object):
     def __init__(self, deploy_path, clean=False):
         self._deploy_path = deploy_path
         self.clean = clean
@@ -32,23 +32,23 @@ class FileWriter():
         for filename, f in files:
             output_path = os.path.join(self._deploy_path, filename)
 
-            def makedirs(path, dir):
-                if not dir:
+            def makedirs(path, directory):
+                if not directory:
                     return
 
-                if os.path.isdir(os.path.join(self._deploy_path, path, dir)):
+                if os.path.isdir(os.path.join(self._deploy_path, path, directory)):
                     return
 
                 makedirs(*os.path.split(path))
 
                 if os.path.isdir(os.path.join(self._deploy_path, path)) or path == '':
-                    dirpath = os.path.join(self._deploy_path, path, dir)
+                    dirpath = os.path.join(self._deploy_path, path, directory)
                     os.mkdir(dirpath)
                     return
 
             makedirs(*os.path.split(os.path.dirname(filename)))
 
-            self.logger.debug('Writing {} ({})'.format(output_path, 'binary' if f.is_binary else 'text'))
+            self.logger.debug('Writing %s (%s)', output_path, 'binary' if f.is_binary else 'text')
             if not f.is_binary:
                 codecs.open(output_path, 'w', 'utf-8').write(f['contents'])
             else:
@@ -56,7 +56,9 @@ class FileWriter():
 
 
 
-class FileLoaderError(HanaPluginError): pass
-class DeployDirectoryError(FileLoaderError): pass
+class FileLoaderError(HanaPluginError):
+    pass
 
+class DeployDirectoryError(FileLoaderError):
+    pass
 

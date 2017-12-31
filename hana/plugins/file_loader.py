@@ -1,11 +1,13 @@
-from hana.errors import HanaPluginError
-from hana.core import FSFile
 import logging
 import os
+
 import pathspec
 
-class FileLoader():
-    def __init__(self, source_path, ignore_patterns=[], source_file_keyword=None):
+from hana.errors import HanaPluginError
+from hana.core import FSFile
+
+class FileLoader(object):
+    def __init__(self, source_path, ignore_patterns=(), source_file_keyword=None):
         self._source_path = source_path
         self.ignore_patterns = ignore_patterns
         self.source_file_keyword = source_file_keyword
@@ -17,7 +19,7 @@ class FileLoader():
     def __call__(self, files, hana):
         ignore_spec = pathspec.PathSpec.from_lines('gitwildmatch', self.ignore_patterns)
 
-        for path, dirs, sfiles in os.walk(self._source_path):
+        for path, _, sfiles in os.walk(self._source_path):
             for f in sfiles:
                 source = os.path.join(path, f)
 
@@ -36,8 +38,12 @@ class FileLoader():
 
                 files.add(filepath, FSFile(source, **metadata))
 
-class FileLoaderError(HanaPluginError): pass
-class FileExistsError(FileLoaderError): pass
-class SourceDirectoryError(FileLoaderError): pass
+class FileLoaderError(HanaPluginError):
+    pass
 
+class FileExistsError(FileLoaderError):
+    pass
+
+class SourceDirectoryError(FileLoaderError):
+    pass
 
