@@ -17,6 +17,7 @@ setup(name='hana',
 
     install_requires=[
         'pathspec>=0.5.2',
+        'pyyaml>=3.12',
     ],
 
     author='Mayo Jordanov',
