@@ -1,4 +1,5 @@
 import codecs
+import datetime
 #import importlib
 import logging
 import os.path
@@ -112,13 +113,16 @@ class Hana(object):
         self.plugins.append((plugin, pattern))
 
     def build(self):
+
+        self.metadata['_hana_build_time'] = datetime.datetime.utcnow()
+
         self._process()
 
     def _process(self):
         for plugin, patterns in self.plugins:
             plugin(self.files.filter(patterns), self)
 
-#TODO: Tileset to make filtering more easier.
+#TODO: FileSet to make filtering more easier.
 #      Filter files based on glob pattern, so in plugins:
 #files.filter(glob) returns iterator/generator with matches
 #TODO: This is not ideal and error prone, as it sub-calls .add, etc.
@@ -172,7 +176,6 @@ class FileSet(object):
         if self._parent:
             self._parent.add(filename, f)
 
-    #TODO: verify base path, resolve relative paths
     def remove(self, filename):
         self._files.pop(filename)
 
