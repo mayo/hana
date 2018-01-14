@@ -11,18 +11,11 @@ import pkg_resources
 
 from hana import errors
 
-#TODO: this probably shouldn't be here
-root_logger = logging.getLogger()
-if not root_logger.handlers:
-    root_logger.setLevel(logging.DEBUG)
-    ch = logging.StreamHandler(sys.stdout)
-    ch.setLevel(logging.DEBUG)
-    root_logger.addHandler(ch)
-
-
 class Hana(object):
 
     def __init__(self, configuration=None):
+        self._setup_logging()
+
         self.logger = logging.getLogger(self.__module__)
 
         # Load configuration first, any parameters override config
@@ -33,6 +26,15 @@ class Hana(object):
         self.metadata = {}
 
         self.files = FileSet()
+
+    def _setup_logging(self):
+        logger = logging.getLogger('hana')
+        if not logger.handlers:
+            formatter = logging.Formatter("%(name)s %(levelname)s %(message)s")
+
+            ch = logging.StreamHandler()
+            ch.setFormatter(formatter)
+            logger.addHandler(ch)
 
     def _load_configuration(self, config_file):
         self.logger.info('Loading configuration from "%s"', config_file)
@@ -45,6 +47,15 @@ class Hana(object):
         plugins = config.get('plugins')
         if plugins:
             self._load_plugins(plugins)
+
+        # Logging
+        logging_cfg = config.get('logging')
+        if logging_cfg:
+            for logger_name, logger_config in logging_cfg.iteritems():
+                level = logger_config.get('level').upper()
+                logging.getLogger(logger_name).setLevel(level)
+                self.logger.info('Setting %s log level to: %s', logger_name, level)
+
 
     def _setup_plugins(self, plugins_directory):
         if not os.path.isdir(plugins_directory):
