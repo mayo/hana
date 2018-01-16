@@ -5,7 +5,7 @@ Hana
 
 Yet another static site generator.
 
-**WARNING** This is very much alpha version software. The Plugin API is relatively stable, but there are no guarantees. That being said, I welcome any help or contributions via pull requests.
+**WARNING**: *This is very much alpha version software. The Plugin API is relatively stable, but there are no guarantees. That being said, I welcome any help or contributions via pull requests.*
 
 Hana is a simple pipeling tool that keeps track of files and writes them out to an output directory at the end. Any processing that needs to happen is implemented with plugins. Because of this, Hana is template system agnostic, and can be used to process any files,.
 
