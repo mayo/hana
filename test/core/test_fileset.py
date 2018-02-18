@@ -44,34 +44,15 @@ def test_getitem():
     fm['file_a'] == file_a
 
 
-def test_subset_access():
+def test_filter():
     fm = FileSet()
 
     fm.add('file_a', File(contents='test file a', count=1))
     fm.add('file_b', File(contents='test file b', count=1))
 
-    fm_sub = fm.filter(['*_a'])
-
-    fm_sub['file_a']['count'] += 1
+    for _, hfile in fm.filter().patterns('*_a'):
+        hfile['count'] += 1
 
     assert fm['file_a']['count'] == 2
     assert fm['file_b']['count'] == 1
-
-
-def test_subset_add():
-    fm = FileSet()
-
-    file_b = File(contents='test file b', count=1)
-    file_c = File(contents='test file c', count=1)
-
-    fm.add('file_a', File(contents='test file a', count=1))
-    fm.add('file_b', file_b)
-
-    fm_sub = fm.filter(['*_a'])
-
-    fm_sub.add('file_c', file_c)
-
-    assert 'file_b' not in fm_sub
-    assert 'file_c' in fm_sub
-    assert 'file_c' in fm
 

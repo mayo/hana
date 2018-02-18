@@ -36,7 +36,7 @@ class FileLoader(object):
                 if self.source_file_keyword:
                     metadata[self.source_file_keyword] = source
 
-                files.add(filepath, FSFile(source, **metadata))
+                hana.files.add(filepath, FSFile(source, **metadata))
 
 class FileLoaderError(HanaPluginError):
     pass

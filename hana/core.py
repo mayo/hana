@@ -1,6 +1,7 @@
 import codecs
 import datetime
 #import importlib
+import itertools
 import logging
 import os.path
 import sys
@@ -124,21 +125,15 @@ class Hana(object):
         self.plugins.append((plugin, pattern))
 
     def build(self):
-
         self.metadata['_hana_build_time'] = datetime.datetime.utcnow()
 
-        self._process()
-
-    def _process(self):
         for plugin, patterns in self.plugins:
-            plugin(self.files.filter(patterns), self)
+            filter = self.files.filter()
 
-#TODO: FileSet to make filtering more easier.
-#      Filter files based on glob pattern, so in plugins:
-#files.filter(glob) returns iterator/generator with matches
-#TODO: This is not ideal and error prone, as it sub-calls .add, etc.
-#      This should really return a proxy that's smart enough to iterate
-#      through matching items, rather than recursively call action methods.
+            if patterns:
+                filter.patterns(*patterns)
+            plugin(filter, self)
+
 class FileSet(object):
 
     def __init__(self, parent=None):
@@ -160,52 +155,100 @@ class FileSet(object):
     def filenames(self):
         """Return all filenames
         """
-
         return self._files.iterkeys()
 
-    def filter(self, patterns):
-        """Return FileSet with subset of files
+    def filter(self):
+        """Return FileSetFilter
         """
+        return FileSetFilter(self)
 
-        if not patterns:
-            return self
-
-        fm = FileSet(self)
-
-        match = pathspec.PathSpec.from_lines('gitwildmatch', patterns)
-
-        for filename, f in self:
-            if match.match_file(filename):
-                fm.add(filename, f)
-
-        return fm
-
-    #TODO: verify base path, resolve relative paths
     def add(self, filename, f):
         self._files[filename] = f
-
-        if self._parent:
-            self._parent.add(filename, f)
 
     def remove(self, filename):
         self._files.pop(filename)
 
-        if self._parent:
-            self._parent.remove(filename)
-
     def rename(self, filename, new_name):
         self._files[new_name] = self._files.pop(filename)
 
-        if self._parent:
-            self._parent.rename(filename, new_name)
+class FileSetFilter(object):
+    ORDER_ASC = 'asc'
+    ORDER_DESC = 'desc'
 
-#TODO: finish me
-class FileSetProxy(object):
-    def __init__(self, file_manager, patterns):
-        self._file_manager = file_manager
-        self._patterns = patterns
+    def __init__(self, file_set):
+        self.file_set = file_set
 
+        self._patterns = []
+        self._metadata = []
+        self._limit = None
+        self._order = []
 
+    def _flatten(self, mdlist):
+        return set(itertools.chain(*mdlist))
+
+    def __iter__(self):
+        counter = 0
+        files = self.file_set
+        self._patterns = self._flatten(self._patterns)
+        matcher = pathspec.PathSpec.from_lines('gitwildmatch', self._patterns)
+
+        if self._order:
+            #TODO: implement
+            pass
+            # files = sorted(files, ...)
+
+        for filename, hfile in files:
+            if self._limit and counter >= self._limit:
+                # Limit reached, end iteration
+                return
+
+            if self._patterns and not matcher.match_file(filename):
+                # If patterns defined and file doesn't match skip
+                continue
+
+            if self._metadata:
+                skip = False
+                for k, v in self._metadata:
+                    if not k in hfile:
+                        skip = True
+                        continue
+
+                    if not hfile[k] == v:
+                        skip = True
+                        continue
+
+                if skip:
+                    continue
+
+            counter += 1
+            yield filename, hfile
+
+    def patterns(self, *patterns):
+        # Check to allow arg expansion when it's empty
+        if patterns:
+            self._patterns.append(patterns)
+
+        return self
+
+    def metadata(self, key, value):
+        #NOTE: simple metadata matching key:value supporting "and" when specified multiple times
+        #TODO: implement "key between" (times, dates)
+        #TODO: inplement "key contains value" (lists, dictionaries)
+        #TODO: logic "key == x or key == y" etc.
+        #TODO: more complex logic: [ [ 'title' == 'x' | title == 'y' ] & published_on < 1234 ]
+        #                          [ [ KEY('title) == 'x' | KEY(title) == 'y' ] & 
+        tup = key, value
+        self._metadata.append(tup)
+
+        return self
+
+    def limit(self, limit=None):
+        self._limit = limit
+        return self
+
+    def order(self, key, direction):
+        #TODO: implement
+        pass
 
 class File(dict):
 
