@@ -1,5 +1,6 @@
 import codecs
 import datetime
+import hashlib
 #import importlib
 import itertools
 import logging
@@ -285,6 +286,14 @@ class File(dict):
         if key not in self:
             self[key] = value
         return self[key]
+
+    def sha1sum(self):
+        print 'file', self.filename, 'is binary', self.is_binary
+
+        if self.is_binary:
+            return hashlib.sha1(self['contents']).hexdigest()
+        else:
+            return hashlib.sha1(codecs.encode(self['contents'], 'utf-8')).hexdigest()
 
 
 class FSFile(File):
