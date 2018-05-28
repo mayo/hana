@@ -291,8 +291,6 @@ class File(dict):
         return self.hashsum(hashlib.sha1).hexdigest()
 
     def hashsum(self, hash_algo):
-        print 'file', self.filename, 'is binary', self.is_binary
-
         if self.is_binary:
             return hash_algo(self['contents'])
         else:
