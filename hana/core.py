@@ -288,12 +288,15 @@ class File(dict):
         return self[key]
 
     def sha1sum(self):
+        return self.hashsum(hashlib.sha1).hexdigest()
+
+    def hashsum(self, hash_algo):
         print 'file', self.filename, 'is binary', self.is_binary
 
         if self.is_binary:
-            return hashlib.sha1(self['contents']).hexdigest()
+            return hash_algo(self['contents'])
         else:
-            return hashlib.sha1(codecs.encode(self['contents'], 'utf-8')).hexdigest()
+            return hash_algo(codecs.encode(self['contents'], 'utf-8'))
 
 
 class FSFile(File):
