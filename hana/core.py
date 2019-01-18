@@ -53,7 +53,7 @@ class Hana(object):
         # Logging
         logging_cfg = config.get('logging')
         if logging_cfg:
-            for logger_name, logger_config in logging_cfg.iteritems():
+            for logger_name, logger_config in logging_cfg.items():
                 level = logger_config.get('level').upper()
                 logging.getLogger(logger_name).setLevel(level)
                 self.logger.info('Setting %s log level to: %s', logger_name, level)
@@ -142,7 +142,8 @@ class FileSet(object):
         self._parent = parent
 
     def __iter__(self):
-        return self._files.iteritems()
+        #TODO: is this right? changed for py3
+        return iter(self._files.items())
 
     def __len__(self):
         return len(self._files)
@@ -156,7 +157,7 @@ class FileSet(object):
     def filenames(self):
         """Return all filenames
         """
-        return self._files.iterkeys()
+        return self._files.keys()
 
     def filter(self):
         """Return FileSetFilter
@@ -171,6 +172,7 @@ class FileSet(object):
 
     def rename(self, filename, new_name):
         self._files[new_name] = self._files.pop(filename)
+
 
 class FileSetFilter(object):
     ORDER_ASC = 'asc'
@@ -330,7 +332,7 @@ class FSFile(File):
 
                 while True:
                     chunk = fin.read(CHUNKSIZE)
-                    if '\0' in chunk:
+                    if b'\0' in chunk:
                         self._is_binary = True
                         break
 
