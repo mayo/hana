@@ -7,10 +7,10 @@ install:
 - pip install .
 - pip install -r requirements.txt
 script: pytest test/
-deploy:
-  provider: pypi
-  user: mayo
-  on:
-    branch: master
-  password:
-    secure: hRxjZqQ7Z25c5LxCGo5m4CTRCK3VnAzGYdoMgNPs1j20D0DvzrRPG4955TaV0mYrii/be18LacDGfDOWncqtc/p4Vi9vOtSkbpI6vn248gXc+b3041lghuuHN0UEXbRlD0BoCr0nfUy5v76OXFOoeB2Z7zeTYzh8qR+BOjaNEnSdNEVo6rSY/uhrp4CW9z4llgEuEx0veNq/OOTNBYxHI+59SnF41lxJq7SnSpJ8lQ7UOXPKXQxSLI9DDZp53cz/0BIWsUHEREm/mgZwtw7hQihzIFUTkAqIpP3nhpTeSprTUtznydBYhDAePtVsTGAXZeP6wg5HtOare54DTHMOZXhS6pOF07YOMcxP2o313VC+khPbgxQpNQsebnGgVbSuluXKKzCvw9E6+PvZ547L3PM8vBUj5Ri44zpXUkqcRciLMTt4nFWGUmxg9o+Y5jf5i2fKtj3itM+IwWfaLTuEWK6KGLa/rjqdNGfg1hagzUqk1ug2YtC5tmvFDQ1n1BTzqiBzdHIv5vKeql7Qgu4y/ROkcz/XwiM+AB3YcA9uaNV3YBAvB1g7oNS8xU36LZOAXwLYnL6n1yflyUYWXSRMxKhW39mZ7XwdL+n2WnIK/o3xQ7kq3aCeZRgaGaxO3yoMgyDeksXyw2+5PV9UvvWpFhveq2HND2D9yn18cayrOBw=
+#deploy:
+#  provider: pypi
+#  user: mayo
+#  on:
+#    branch: master
+#  password:
+#    secure: hRxjZqQ7Z25c5LxCGo5m4CTRCK3VnAzGYdoMgNPs1j20D0DvzrRPG4955TaV0mYrii/be18LacDGfDOWncqtc/p4Vi9vOtSkbpI6vn248gXc+b3041lghuuHN0UEXbRlD0BoCr0nfUy5v76OXFOoeB2Z7zeTYzh8qR+BOjaNEnSdNEVo6rSY/uhrp4CW9z4llgEuEx0veNq/OOTNBYxHI+59SnF41lxJq7SnSpJ8lQ7UOXPKXQxSLI9DDZp53cz/0BIWsUHEREm/mgZwtw7hQihzIFUTkAqIpP3nhpTeSprTUtznydBYhDAePtVsTGAXZeP6wg5HtOare54DTHMOZXhS6pOF07YOMcxP2o313VC+khPbgxQpNQsebnGgVbSuluXKKzCvw9E6+PvZ547L3PM8vBUj5Ri44zpXUkqcRciLMTt4nFWGUmxg9o+Y5jf5i2fKtj3itM+IwWfaLTuEWK6KGLa/rjqdNGfg1hagzUqk1ug2YtC5tmvFDQ1n1BTzqiBzdHIv5vKeql7Qgu4y/ROkcz/XwiM+AB3YcA9uaNV3YBAvB1g7oNS8xU36LZOAXwLYnL6n1yflyUYWXSRMxKhW39mZ7XwdL+n2WnIK/o3xQ7kq3aCeZRgaGaxO3yoMgyDeksXyw2+5PV9UvvWpFhveq2HND2D9yn18cayrOBw=
