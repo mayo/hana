@@ -1,7 +1,6 @@
 import codecs
 import datetime
 import hashlib
-#import importlib
 import itertools
 import logging
 import os.path
@@ -15,17 +14,21 @@ from hana import errors
 
 class Hana(object):
 
-    def __init__(self, configuration=None):
+    def __init__(self, configuration=None, metadata=dict()):
         self._setup_logging()
 
         self.logger = logging.getLogger(self.__module__)
 
+        self.config = {}
+        self.metadata = metadata
+
         # Load configuration first, any parameters override config
         if configuration:
-            self._load_configuration(configuration)
+            self.config = self._load_configuration(configuration)
+
+        self._process_config()
 
         self.plugins = []
-        self.metadata = {}
 
         self.files = FileSet()
 
@@ -40,84 +43,79 @@ class Hana(object):
 
     def _load_configuration(self, config_file):
         self.logger.info('Loading configuration from "%s"', config_file)
-        config = yaml.safe_load(open(config_file))
+        return yaml.safe_load(open(config_file))
 
-        plugins_directory = config.get('plugins_directory')
-        if plugins_directory:
-            self._setup_plugins(plugins_directory)
-
-        plugins = config.get('plugins')
-        if plugins:
-            self._load_plugins(plugins)
-
+    def _process_config(self):
         # Logging
-        logging_cfg = config.get('logging')
+        logging_cfg = self.config.get('logging')
         if logging_cfg:
             for logger_name, logger_config in logging_cfg.items():
                 level = logger_config.get('level').upper()
                 logging.getLogger(logger_name).setLevel(level)
-                self.logger.info('Setting %s log level to: %s', logger_name, level)
+                self.logger.debug('Setting %s log level to: %s', logger_name, level)
 
+        # Metadata
+        metadata = self.config.get('metadata')
+        if metadata:
+            self.metadata.update(metadata)
 
-    def _setup_plugins(self, plugins_directory):
-        if not os.path.isdir(plugins_directory):
-            raise errors.InvalidPluginsDirectory()
+        # Plugins
+        plugins_directory = self.config.get('plugins_directory')
+        if plugins_directory:
+            abs_plugins_dir = os.path.abspath(plugins_directory)
 
-        #TODO: load plugins somehow... how do we discover custom plugins vs installed plugins.
-        #      Command plugins vs normal plugins, ... can we do entry points with modules? Not
-        #      all plugins from plugins_directory should be loaded, only the required ones
+            if not os.path.isdir(abs_plugins_dir):
+                raise errors.InvalidPluginsDirectory()
 
-        #try:
-        #    fp, filename, description = imp.find_module(self.module_name, [plugins_directory])
-        #except ImportError as err:
-        #    raise errors.PluginNotFoundError(
-        #       'Missing plugins: "{}" not found'.format(missing_plugins)
-        #    )
+            sys.path.insert(0, abs_plugins_dir)
+            #self._setup_plugins(plugins_directory)
 
-        ## Load the module
-        #try:
-        #    module_obj = imp.load_module(self.module_name, fp, filename, description)
-        #except Exception as err:
-        #    self.log.exception('Failed to load module "{module:s}" from file "{path:s}": {err:s}'.format(
-        #        module=self.module_name, path=self.module_path, err=err))
-        #    raise
-        #finally:
-        #    fp.close()
+        build_steps = self.config.get('build')
+        if build_steps:
+            plugins = set([])
 
-        #self.module_bytecode = getattr(module_obj, self.module_name)
+            for plugin in build_steps:
+                if isinstance(plugin, str):
+                    plugins.add(plugin)
 
-        ## Update where the module was loaded from
-        #self.module_path = os.path.join(MODULES_PATH, filename)
+                elif isinstance(plugin, dict):
+                    plugins.add(next(iter(plugin)))
 
-        #self.module_instance = self.module_bytecode()
+                else:
+                    #TODO: plugin error
+                    raise RuntimeError('Invalid plugin configuration')
+
+            self._load_plugins(plugins)
 
 
     def _load_plugins(self, plugins):
         self.logger.info('Loading plugins')
 
-        # Collect configured plugins
-        wanted_plugins = set([p.keys()[0] for p in plugins])
+        plugins = set(plugins)
 
-        # Collect all entrypoints for plugins
-        available_plugins = {e.name: e for e in pkg_resources.iter_entry_points(group='hana.plugins')}
+        for plugin in plugins:
+            self.load_plugin(plugin)
 
-        # Fail early for missing plugins
-        missing_plugins = wanted_plugins - set(available_plugins.keys())
-        if missing_plugins:
-            raise errors.PluginNotFoundError('Missing plugins: "{}" not found'.format(missing_plugins))
 
-        # Iterate plugins and make new instances
-        for plugin_spec in plugins:
-            plugin_name, plugin_config = plugin_spec.items()[0]
+    def load_plugin(self, plugin):
+        parts = plugin.split(':', 1)
+        module_path = None
+        import_name = None
 
-            # Get the plugin callable
-            plugin = available_plugins[plugin_name].load()
+        if len(parts) < 2:
+            module_path = parts[0]
+            import_name = parts[0].split('.')[-1]
+        else:
+            module_path, import_name = parts
 
-            # Initialize the plugin if requested or if parameters passed
-            if plugin_config.get('init', False) or 'parameters' in plugin_config:
-                plugin = plugin(**plugin_config.get('parameters'))
+        try:
+            self.logger.info('Loading plugin %s from %s', import_name, module_path)
+            mod = __import__(module_path, None, None, [import_name])
+            return getattr(mod, import_name)
+        except ImportError as err:
+            self.logger.exception('Error loading plugin %s', plugin)
+            raise RuntimeError("Couldn't load plugin {}".format(plugin))
 
-            self.plugin(plugin, plugin_config.get('patterns'))
 
     def plugin(self, plugin, pattern=None):
         if isinstance(pattern, str):
