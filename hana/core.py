@@ -252,6 +252,11 @@ class FileSetFilter(object):
         pass
 
 class File(dict):
+    """
+    Generic File object.
+
+    Files in Hana are key-value pairs, with one special key, "contents", representing the contents of the file.
+    """
 
     def __init__(self, *args, **kwargs):
         super(File, self).__init__()
@@ -266,7 +271,12 @@ class File(dict):
         if not self['contents']:
             return True
 
-        return '\0' in self['contents']
+        test = '\0'
+
+        if isinstance(self['contents'], bytes):
+            test = b'\0'
+
+        return test in self['contents']
 
     def update(self, *args, **kwargs):
         if args:
@@ -298,6 +308,11 @@ class File(dict):
 
 
 class FSFile(File):
+    """
+    File system backed File object.
+
+    The contents will be loaded lazily.
+    """
 
     def __init__(self, filename, *args, **kwargs):
         super(FSFile, self).__init__(*args, **kwargs)
@@ -320,9 +335,8 @@ class FSFile(File):
     def is_binary(self):
         # If the file is already loaded, it may have been processed
         if self.loaded:
-            #TODO: call super.is_binary?
             self._is_binary = None
-            return '\0' in self['contents']
+            return super(FSFile, self).is_binary
 
         if self._is_binary is None:
             with open(self.filename, 'rb') as fin:
