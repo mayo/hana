@@ -19,6 +19,20 @@ def test_simple():
 
     b.build()
 
+def test_simple_hash():
+    def plugin(files, hana):
+        for _, hfile in files:
+            hfile.sha1sum()
+
+    b = hana.Hana()
+
+    b.plugin(hana.plugins.file_loader.FileLoader(source_path='test/simple'))
+    b.plugin(hana.plugins.file_writer.FileWriter(deploy_path='test/out'))
+    b.plugin(plugin)
+
+    b.build()
+
+
 def test_plugins():
     plugin_executed = {}
 

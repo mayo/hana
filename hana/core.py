@@ -302,7 +302,7 @@ class File(dict):
 
     def hashsum(self, hash_algo):
         if self.is_binary:
-            return hash_algo(self['contents'])
+            return hash_algo(self['contents'] or b'')
         else:
             return hash_algo(codecs.encode(self['contents'], 'utf-8'))
 
