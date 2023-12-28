@@ -42,14 +42,13 @@ class FileWriter(object):
                     dirpath = os.path.join(self._deploy_path, path, directory)
                     os.mkdir(dirpath)
                     return
-
             makedirs(*os.path.split(os.path.dirname(filename)))
 
             self.logger.debug('Writing %s (%s)', output_path, 'binary' if f.is_binary else 'text')
             if not f.is_binary:
                 codecs.open(output_path, 'w', 'utf-8').write(f['contents'])
             else:
-                open(output_path, 'wb').write(f['contents'])
+                open(output_path, 'wb').write(f['contents'] or b'')
 
 
 #class FileLoaderError(HanaPluginError):
