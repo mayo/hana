@@ -7,6 +7,9 @@ from hana.errors import HanaPluginError
 from hana.core import FSFile
 
 class FileLoader(object):
+    """
+    source_file_keyword: name of front matter key that will be injected with path to the source file
+    """
     def __init__(self, source_path, ignore_patterns=(), source_file_keyword=None):
         self._source_path = source_path
         self.ignore_patterns = ignore_patterns

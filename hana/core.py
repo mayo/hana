@@ -1,8 +1,10 @@
 import codecs
 import datetime
+from functools import reduce
 import hashlib
 import itertools
 import logging
+import operator
 import os.path
 import sys
 import yaml
@@ -173,31 +175,30 @@ class FileSet(object):
 
 
 class FileSetFilter(object):
-    ORDER_ASC = 'asc'
-    ORDER_DESC = 'desc'
+    # TODO: define union (+) of two filter sets
+    # TODO: define difference (-) of two filter sets
+    # TODO: define intersection (&) of two filter sets
 
     def __init__(self, file_set):
         self.file_set = file_set
 
-        self._patterns = []
-        self._metadata = []
+        self._patterns = set([])
+        self._metadata = set([])
         self._limit = None
-        self._order = []
-
-    def _flatten(self, mdlist):
-        return set(itertools.chain(*mdlist))
+        self._order = set([])
 
     def __iter__(self):
         counter = 0
         files = self.file_set
-        self._patterns = self._flatten(self._patterns)
         matcher = pathspec.PathSpec.from_lines('gitwildmatch', self._patterns)
 
+        #TODO: how to implement order? Doing it first may sort way too many items, doing it last doesn't work as generator?
         if self._order:
             #TODO: implement
             pass
             # files = sorted(files, ...)
 
+        #TODO: should this operate on a copy, in case of deletes or adds?
         for filename, hfile in files:
             if self._limit and counter >= self._limit:
                 # Limit reached, end iteration
@@ -209,12 +210,15 @@ class FileSetFilter(object):
 
             if self._metadata:
                 skip = False
-                for k, v in self._metadata:
-                    if not k in hfile:
+                for mdk in self._metadata:
+                    # Handle nested keys. If key doesn't exist, skip this file
+                    try:
+                        value = reduce(operator.getitem, mdk.name, hfile)
+                    except KeyError:
                         skip = True
                         continue
 
-                    if not hfile[k] == v:
+                    if not mdk.eval(value):
                         skip = True
                         continue
 
@@ -225,21 +229,16 @@ class FileSetFilter(object):
             yield filename, hfile
 
     def patterns(self, *patterns):
-        # Check to allow arg expansion when it's empty
         if patterns:
-            self._patterns.append(patterns)
+            for pattern in patterns:
+                self._patterns.add(pattern)
 
         return self
 
-    def metadata(self, key, value):
-        #NOTE: simple metadata matching key:value supporting "and" when specified multiple times
-        #TODO: implement "key between" (times, dates)
-        #TODO: inplement "key contains value" (lists, dictionaries)
-        #TODO: logic "key == x or key == y" etc.
-        #TODO: more complex logic: [ [ 'title' == 'x' | title == 'y' ] & published_on < 1234 ]
-        #                          [ [ KEY('title) == 'x' | KEY(title) == 'y' ] & 
-        tup = key, value
-        self._metadata.append(tup)
+    def metadata(self, *metadata):
+        if metadata:
+            for metad in metadata:
+                self._metadata.add(metad)
 
         return self
 
@@ -247,9 +246,12 @@ class FileSetFilter(object):
         self._limit = limit
         return self
 
-    def order(self, key, direction):
-        #TODO: implement
-        pass
+    def order(self, *metakey):
+        if args:
+            for key in metakey:
+                self._order.add(key)
+
+        return self
 
 class File(dict):
     """
@@ -334,6 +336,28 @@ class FSFile(File):
     @property
     def is_binary(self):
         # If the file is already loaded, it may have been processed
+        # TODO: the logic here is flawed...? If the file wasn't loaded yet, we
+        #       read the file and determine if it's binary, but don't actually
+        #       load the data. The result gets cached. BUT determining if it's
+        #       binary involved actually reading the data, but not storing it, so
+        #       the file is esentially read twice.
+        #       On the other hand, if the file is loaded already, we evaluate the
+        #       contents to determine if it's binary, each time the function is
+        #       called, cache be damned. The reason here is that a plugin could
+        #       have changed the contents, so the cache may be out of date.
+        #       What really should happen:
+        #       * if is_binary() is called, load the file contents and determine
+        #         if it's binary.
+        #           * depending on the result, either encode the contents to utf8
+        #             or leave it be
+        #           * cache binary status
+        #       * if _get_contents is called, read as binary, determine if it's
+        #         binary
+        #           * encode file if necessary
+        #           * cache binary status
+        #       * monitor __setitem__, and if 'contents' gets set, clear is_binary
+        #         cache.
+        #       The only disadvantage with this is that binary files get pre-loaded... How much of a file usually gets read before \0 occurs?
         if self.loaded:
             self._is_binary = None
             return super(FSFile, self).is_binary
